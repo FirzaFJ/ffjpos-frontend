@@ -131,11 +131,11 @@ export default function Login() {
         </form>
 
         {/* Footer info dummy account */}
-        <div style={styles.footerNote}>
+        {/* <div style={styles.footerNote}>
           <p style={{ margin: '0 0 4px 0', fontWeight: '600' }}>Akun Default:</p>
           <code>Admin: admin@pos.com | Pass: password123</code><br/>
           <code>Kasir: kasir@pos.com | Pass: password123</code>
-        </div>
+        </div> */}
       </div>
     </div>
   );
