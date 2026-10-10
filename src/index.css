@@ -1,0 +1,35 @@
+
+
+/* Di Laptop/PC: Kunci height agar pas 100vh tanpa scroll luar */
+@media (min-width: 769px) {
+  html, body {
+    height: 100vh;
+    overflow: hidden;
+  }
+}
+
+/* Di HP/Mobile: Izinkan height bertambah & aktifkan scroll */
+@media (max-width: 768px) {
+  html, body {
+    height: auto !important;
+    min-height: 100% !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+  }
+}
+
+/* Aturan Global Utama */
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  min-height: 100vh;
+  overflow-x: hidden; /* Mencegah scroll ke samping yang tidak perlu */
+  overflow-y: auto !important; /* Memastikan scroll ke bawah selalu aktif jika konten panjang */
+}
+
+#root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
