@@ -97,6 +97,13 @@ export default function Settings() {
   const handleLogoChange = (e) => {
     const file = e.target.files[0];
     if (file) {
+      // Cek apakah ukuran file lebih dari 2MB (2 * 1024 * 1024 bytes)
+      if (file.size > 2 * 1024 * 1024) {
+        showToast('Ukuran gambar terlalu besar! Maksimal 2MB.', 'error');
+        e.target.value = ''; // Reset input
+        return;
+      }
+
       setLogoFile(file);
       setLogoPreview(URL.createObjectURL(file));
       setRemoveLogo(false);
