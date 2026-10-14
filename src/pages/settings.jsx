@@ -34,30 +34,21 @@ export default function Settings() {
   const getImageUrl = (path) => {
     if (!path) return null;
 
-    // Jika dari backend sudah berupa URL absolut https:// yang valid (tidak terpotong)
     if (path.startsWith('http://') || path.startsWith('https://')) {
-      // Cegah bug domain terpotong "https://.firza-portofolio..."
       if (path.includes('://.firza')) {
         return path.replace('://.firza', '://api.firza');
       }
       return path;
     }
 
-    // Ambil base domain dari .env VITE_API_URL, jika kosong / bermasalah gunakan manual URL
     let baseUrl = import.meta.env.VITE_API_URL || 'https://api.firza-portofolio.my.id';
-    
-    // Hapus suffix '/api' dari base URL jika ada
     baseUrl = baseUrl.replace(/\/api\/?$/, '');
 
-    // Pastikan tidak ada bug domain terpotong
     if (baseUrl.includes('://.firza')) {
       baseUrl = baseUrl.replace('://.firza', '://api.firza');
     }
 
-    // Pastikan path berawalan slash /
     const cleanPath = path.startsWith('/') ? path : `/${path}`;
-
-    // Gabungkan domain + path storage
     return `${baseUrl}/storage${cleanPath.replace('/storage', '')}`;
   };
 
@@ -94,18 +85,16 @@ export default function Settings() {
     }
   };
 
-  // FUNGSI KOMPRESI GAMBAR OTOMATIS
+  // FUNGSI KOMPRESI GAMBAR OTOMATIS (MENDUKUNG TRANSPARANSI & PERBAIKAN BACKGROUND HITAM)
   const handleLogoChange = (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
-    // Cek apakah file adalah gambar
     if (!file.type.startsWith('image/')) {
       showToast('Harap pilih file gambar (JPG/PNG)', 'error');
       return;
     }
 
-    // Baca file menggunakan FileReader & Canvas untuk kompresi
     const reader = new FileReader();
     reader.readAsDataURL(file);
     reader.onload = (event) => {
@@ -116,7 +105,6 @@ export default function Settings() {
         let width = img.width;
         let height = img.height;
 
-        // Batasi resolusi maksimal (misal lebar/tinggi max 500px) agar ukuran file jadi kecil
         const MAX_SIZE = 500;
         if (width > height) {
           if (width > MAX_SIZE) {
@@ -133,28 +121,37 @@ export default function Settings() {
         canvas.width = width;
         canvas.height = height;
         const ctx = canvas.getContext('2d');
+
+        // Tentukan format output berdasarkan format file yang di-upload
+        const isTransparentFormat = file.type === 'image/png' || file.type === 'image/webp';
+        const outputType = isTransparentFormat ? file.type : 'image/jpeg';
+
+        // Jika gambar non-transparan (misal JPEG), beri background putih bersih agar tidak hitam
+        if (!isTransparentFormat) {
+          ctx.fillStyle = '#FFFFFF';
+          ctx.fillRect(0, 0, width, height);
+        }
+
         ctx.drawImage(img, 0, 0, width, height);
 
-        // Ubah ke format blob/file dengan kualitas 0.8 (80%)
+        // Ubah ke blob dengan format sesuai tipe aslinya
         canvas.toBlob((blob) => {
           if (!blob) {
             showToast('Gagal memproses gambar', 'error');
             return;
           }
 
-          // Buat file baru dari hasil kompresi canvas
           const compressedFile = new File([blob], file.name, {
-            type: 'image/jpeg',
+            type: outputType,
             lastModified: Date.now(),
           });
 
-          // Set preview & file yang akan dikirim (ukuran kini sudah di bawah 100KB)
           setLogoFile(compressedFile);
           setLogoPreview(URL.createObjectURL(compressedFile));
           setRemoveLogo(false);
           
           showToast('Gambar berhasil dikompres & siap disimpan', 'success');
-        }, 'image/jpeg', 0.8);
+        }, outputType, 0.8);
       };
     };
   };
@@ -356,7 +353,7 @@ const styles = {
   btnSecondary: { padding: '10px 14px', backgroundColor: '#fff', color: '#334155', border: '1px solid #cbd5e1', borderRadius: '8px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' },
   card: { backgroundColor: '#fff', borderRadius: '12px', border: '1px solid #e2e8f0', padding: '24px' },
   logoBox: { width: '140px', height: '140px', borderRadius: '12px', border: '2px dashed #cbd5e1', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f8fafc', overflow: 'hidden' },
-  logoImg: { width: '100%', height: '100%', objectFit: 'cover' },
+  logoImg: { width: '100%', height: '100%', objectFit: 'contain' },
   uploadBtn: { padding: '6px 12px', backgroundColor: '#f1f5f9', color: '#334155', borderRadius: '6px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px', border: '1px solid #cbd5e1' },
   deleteBtn: { padding: '6px 12px', backgroundColor: '#fef2f2', color: '#dc2626', borderRadius: '6px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px', border: '1px solid #fecaca' },
   formGroup: { display: 'flex', flexDirection: 'column', gap: '6px' },

@@ -59,7 +59,6 @@ export default function TransactionHistory() {
 
   useEffect(() => {
     fetchStoreSettings();
-    fetchTransactions();
     fetchTransactions(true);
   }, []);
 
@@ -87,22 +86,22 @@ export default function TransactionHistory() {
   };
 
   const fetchStoreSettings = async () => {
-    const cachedSettings = localStorage.getItem('store_settings');
-    if (cachedSettings) {
-      setStoreSettings(JSON.parse(cachedSettings));
-      setLoading(false);
-      return;
-    }
-
     try {
       const res = await api.get('/settings');
-      const data = res.data?.data || null;
+      let data = res.data?.data || res.data || null;
+
+      if (data && data.logo) {
+        // 1. Ambil nama file/path murni (hilangkan domain lama atau prefix storage/)
+        const cleanPath = data.logo.replace(/^https?:\/\/[^\/]+\//, '').replace(/^storage\//, '');
+        
+        // 2. Gabungkan dengan URL domain hosting backend yang benar
+        data.logo = `https://api.firza-portofolio.my.id/storage/${cleanPath}`;
+      }
+
       setStoreSettings(data);
       localStorage.setItem('store_settings', JSON.stringify(data));
     } catch (err) {
-      console.error('Gagal memuat pengaturan:', err);
-    } finally {
-      setLoading(false);
+      console.error('Gagal memuat pengaturan toko:', err);
     }
   };
 
