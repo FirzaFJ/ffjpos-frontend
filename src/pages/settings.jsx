@@ -8,7 +8,7 @@ export default function Settings() {
   const [submitting, setSubmitting] = useState(false);
   const [logoPreview, setLogoPreview] = useState(null);
   const [logoFile, setLogoFile] = useState(null);
-  const [removeLogo, setRemoveLogo] = useState(false); // STATE TAMBAHAN UNTUK TANDA HAPUS LOGO
+  const [removeLogo, setRemoveLogo] = useState(false);
 
   // DETEKSI UKURAN LAYAR (RESPONSIF MOBILE / PC)
   const [isMobile, setIsMobile] = useState(
@@ -30,6 +30,37 @@ export default function Settings() {
     receipt_footer_text: '',
   });
 
+  // HELPER PERBAIKAN URL GAMBAR (.ENV WITH FALLBACK TO MANUAL LINK)
+  const getImageUrl = (path) => {
+    if (!path) return null;
+
+    // Jika dari backend sudah berupa URL absolut https:// yang valid (tidak terpotong)
+    if (path.startsWith('http://') || path.startsWith('https://')) {
+      // Cegah bug domain terpotong "https://.firza-portofolio..."
+      if (path.includes('://.firza')) {
+        return path.replace('://.firza', '://api.firza');
+      }
+      return path;
+    }
+
+    // Ambil base domain dari .env VITE_API_URL, jika kosong / bermasalah gunakan manual URL
+    let baseUrl = import.meta.env.VITE_API_URL || 'https://api.firza-portofolio.my.id';
+    
+    // Hapus suffix '/api' dari base URL jika ada
+    baseUrl = baseUrl.replace(/\/api\/?$/, '');
+
+    // Pastikan tidak ada bug domain terpotong
+    if (baseUrl.includes('://.firza')) {
+      baseUrl = baseUrl.replace('://.firza', '://api.firza');
+    }
+
+    // Pastikan path berawalan slash /
+    const cleanPath = path.startsWith('/') ? path : `/${path}`;
+
+    // Gabungkan domain + path storage
+    return `${baseUrl}/storage${cleanPath.replace('/storage', '')}`;
+  };
+
   useEffect(() => {
     fetchSettings();
   }, []);
@@ -49,7 +80,7 @@ export default function Settings() {
       });
 
       if (data.store_logo) {
-        setLogoPreview(`${api.defaults.baseURL.replace('/api', '')}/storage/${data.store_logo}`);
+        setLogoPreview(getImageUrl(data.store_logo));
       } else {
         setLogoPreview(null);
       }
@@ -68,15 +99,14 @@ export default function Settings() {
     if (file) {
       setLogoFile(file);
       setLogoPreview(URL.createObjectURL(file));
-      setRemoveLogo(false); // Batal tanda hapus jika pengguna pilih file baru
+      setRemoveLogo(false);
     }
   };
 
-  // FUNGSI HAPUS LOGO
   const handleRemoveLogo = () => {
     setLogoPreview(null);
     setLogoFile(null);
-    setRemoveLogo(true); // Set flag bahwa logo minta dihapus ke backend
+    setRemoveLogo(true);
   };
 
   const handleSubmit = async (e) => {
@@ -97,7 +127,7 @@ export default function Settings() {
       }
 
       if (removeLogo) {
-        payload.append('remove_logo', '1'); // Kirim signal ke backend untuk hapus logo
+        payload.append('remove_logo', '1');
       }
 
       await api.post('/settings', payload, {
@@ -161,7 +191,6 @@ export default function Settings() {
                 <input type="file" accept="image/*" onChange={handleLogoChange} style={{ display: 'none' }} />
               </label>
 
-              {/* TOMBOL HAPUS LOGO */}
               {logoPreview && (
                 <button
                   type="button"
