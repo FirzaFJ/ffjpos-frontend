@@ -11,7 +11,7 @@ const ThermalReceipt = forwardRef(({ transaction, storeSettings }, ref) => {
 
   const backendBaseUrl = import.meta.env.VITE_API_URL 
     ? import.meta.env.VITE_API_URL.replace('/api', '') 
-    : 'http://localhost:8000';
+    : 'https://api.firza-portofolio.my.id';
 
   const logoUrl = storeSettings?.store_logo 
     ? `${backendBaseUrl}/storage/${storeSettings.store_logo}`
