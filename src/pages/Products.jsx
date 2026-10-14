@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import api from '../api/axios';
 import { 
   Plus, Search, Edit3, Trash2, Package, 
-  X, AlertTriangle, RefreshCw, Check, ArrowDownToLine, ArrowUpFromLine
+  X, AlertTriangle, RefreshCw, Check, ArrowDownToLine, ArrowUpFromLine,
+  ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { showToast, showAlert, showConfirm } from '../utils/sweetalert';
 
@@ -28,6 +29,10 @@ export default function Products() {
   // State Filter & Search
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
+
+  // State Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 20; // 20 produk per halaman
 
   // State Modal Form (Tambah / Edit Informasi Produk)
   const [showModal, setShowModal] = useState(false);
@@ -250,12 +255,38 @@ export default function Products() {
     }
   };
 
+  // Filter Data Produk
   const filteredProducts = products.filter((p) => {
     const matchSearch = p.name.toLowerCase().includes(search.toLowerCase()) ||
                         (p.sku && p.sku.toLowerCase().includes(search.toLowerCase()));
     const matchCategory = selectedCategory === '' || p.category_id === parseInt(selectedCategory);
     return matchSearch && matchCategory;
   });
+
+  // Logika Pagination Data
+  const totalPages = Math.ceil(filteredProducts.length / itemsPerPage);
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentProducts = filteredProducts.slice(indexOfFirstItem, indexOfLastItem);
+
+  // Helper Angka Halaman
+  const getPageNumbers = () => {
+    const pages = [];
+    const maxPageButtons = 5;
+
+    let startPage = Math.max(1, currentPage - 2);
+    let endPage = Math.min(totalPages, startPage + maxPageButtons - 1);
+
+    if (endPage - startPage + 1 < maxPageButtons) {
+      startPage = Math.max(1, endPage - maxPageButtons + 1);
+    }
+
+    for (let i = startPage; i <= endPage; i++) {
+      pages.push(i);
+    }
+
+    return pages;
+  };
 
   const formatRupiah = (number) => {
     return new Intl.NumberFormat('id-ID', {
@@ -299,14 +330,14 @@ export default function Products() {
             type="text"
             placeholder="Cari nama produk / kode SKU..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => { setSearch(e.target.value); setCurrentPage(1); }}
             style={styles.searchInput}
           />
         </div>
 
         <select
           value={selectedCategory}
-          onChange={(e) => setSelectedCategory(e.target.value)}
+          onChange={(e) => { setSelectedCategory(e.target.value); setCurrentPage(1); }}
           style={styles.selectInput}
         >
           <option value="">Semua Kategori</option>
@@ -326,79 +357,122 @@ export default function Products() {
             <p>Tidak ada produk yang ditemukan.</p>
           </div>
         ) : (
-          /* CONTAINER SCROLL KETIKA DATA > 10 */
-          <div style={styles.tableScrollContainer}>
-            <table style={styles.table}>
-              <thead>
-                <tr>
-                  <th style={{ ...styles.th, textAlign: 'center' }}>No</th>
-                  <th style={styles.th}>Kode / SKU</th>
-                  <th style={styles.th}>Nama Produk</th>
-                  <th style={styles.th}>Kategori</th>
-                  <th style={styles.th}>Harga Beli (Modal)</th>
-                  <th style={styles.th}>Harga Jual</th>
-                  <th style={styles.th}>Margin Profit</th>
-                  <th style={styles.th}>Stok</th>
-                  <th style={{ ...styles.th, textAlign: 'center' }}>Aksi</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredProducts.map((p, idx) => {
-                  const categoryObj = categories.find((c) => c.id === p.category_id) || p.category;
-                  const isLowStock = p.stock <= 5;
-                  const profitMargin = (p.price || 0) - (p.cost_price || 0);
+          <>
+            <div style={styles.tableScrollContainer}>
+              <table style={styles.table}>
+                <thead>
+                  <tr>
+                    <th style={{ ...styles.th, textAlign: 'center' }}>No</th>
+                    <th style={styles.th}>Kode / SKU</th>
+                    <th style={styles.th}>Nama Produk</th>
+                    <th style={styles.th}>Kategori</th>
+                    <th style={styles.th}>Harga Beli (Modal)</th>
+                    <th style={styles.th}>Harga Jual</th>
+                    <th style={styles.th}>Margin Profit</th>
+                    <th style={styles.th}>Stok</th>
+                    <th style={{ ...styles.th, textAlign: 'center' }}>Aksi</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {currentProducts.map((p, idx) => {
+                    const absoluteIndex = indexOfFirstItem + idx + 1;
+                    const categoryObj = categories.find((c) => c.id === p.category_id) || p.category;
+                    const isLowStock = p.stock <= 5;
+                    const profitMargin = (p.price || 0) - (p.cost_price || 0);
 
-                  return (
-                    <tr key={p.id || idx} style={styles.tr}>
-                      <td style={{ ...styles.td, textAlign: 'center', color: '#64748b', fontWeight: '500' }}>
-                        {idx + 1}
-                      </td>
-                      <td style={styles.tdCode}>{p.sku || '-'}</td>
-                      <td style={styles.tdName}>{p.name}</td>
-                      <td style={styles.td}>
-                        <span style={styles.categoryBadge}>
-                          {categoryObj ? categoryObj.name : 'Umum'}
-                        </span>
-                      </td>
-                      <td style={styles.td}>{formatRupiah(p.cost_price)}</td>
-                      <td style={styles.tdPrice}>{formatRupiah(p.price)}</td>
-                      <td style={styles.tdMargin}>{formatRupiah(profitMargin)}</td>
-                      <td style={styles.td}>
-                        <span style={styles.stockBadge(isLowStock)}>
-                          {isLowStock && <AlertTriangle size={12} />}
-                          {p.stock} unit
-                        </span>
-                      </td>
-                      <td style={{ ...styles.td, textAlign: 'center' }}>
-                        <div style={{ display: 'flex', justifyContent: 'center', gap: 6 }}>
-                          <button 
-                            onClick={() => handleOpenRestock(p)} 
-                            style={styles.actionBtnRestock} 
-                            title="Restock (Tambah Stok)"
-                          >
-                            <ArrowDownToLine size={14} /> Restock
-                          </button>
-                          <button 
-                            onClick={() => handleOpenStockOut(p)} 
-                            style={styles.actionBtnStockOut} 
-                            title="Stok Out (Koreksi Pengurangan)"
-                          >
-                            <ArrowUpFromLine size={14} /> Stok Out
-                          </button>
-                          <button onClick={() => handleOpenModal(p)} style={styles.actionBtnEdit} title="Edit Informasi">
-                            <Edit3 size={15} />
-                          </button>
-                          <button onClick={() => handleDelete(p.id, p.name)} style={styles.actionBtnDelete} title="Hapus">
-                            <Trash2 size={15} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                    return (
+                      <tr key={p.id || idx} style={styles.tr}>
+                        <td style={{ ...styles.td, textAlign: 'center', color: '#64748b', fontWeight: '500' }}>
+                          {absoluteIndex}
+                        </td>
+                        <td style={styles.tdCode}>{p.sku || '-'}</td>
+                        <td style={styles.tdName}>{p.name}</td>
+                        <td style={styles.td}>
+                          <span style={styles.categoryBadge}>
+                            {categoryObj ? categoryObj.name : 'Umum'}
+                          </span>
+                        </td>
+                        <td style={styles.td}>{formatRupiah(p.cost_price)}</td>
+                        <td style={styles.tdPrice}>{formatRupiah(p.price)}</td>
+                        <td style={styles.tdMargin}>{formatRupiah(profitMargin)}</td>
+                        <td style={styles.td}>
+                          <span style={styles.stockBadge(isLowStock)}>
+                            {isLowStock && <AlertTriangle size={12} />}
+                            {p.stock} unit
+                          </span>
+                        </td>
+                        <td style={{ ...styles.td, textAlign: 'center' }}>
+                          <div style={{ display: 'flex', justifyContent: 'center', gap: 6 }}>
+                            <button 
+                              onClick={() => handleOpenRestock(p)} 
+                              style={styles.actionBtnRestock} 
+                              title="Restock (Tambah Stok)"
+                            >
+                              <ArrowDownToLine size={14} /> Restock
+                            </button>
+                            <button 
+                              onClick={() => handleOpenStockOut(p)} 
+                              style={styles.actionBtnStockOut} 
+                              title="Stok Out (Koreksi Pengurangan)"
+                            >
+                              <ArrowUpFromLine size={14} /> Stok Out
+                            </button>
+                            <button onClick={() => handleOpenModal(p)} style={styles.actionBtnEdit} title="Edit Informasi">
+                              <Edit3 size={15} />
+                            </button>
+                            <button onClick={() => handleDelete(p.id, p.name)} style={styles.actionBtnDelete} title="Hapus">
+                              <Trash2 size={15} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* BARIS PAGINATION */}
+            <div style={styles.paginationContainer}>
+              <div style={styles.paginationInfo}>
+                Menampilkan <b>{indexOfFirstItem + 1}</b> - <b>{Math.min(indexOfLastItem, filteredProducts.length)}</b> dari <b>{filteredProducts.length}</b> produk
+              </div>
+
+              <div style={styles.paginationButtons}>
+                <button
+                  onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                  style={{ ...styles.pageNavBtn, opacity: currentPage === 1 ? 0.5 : 1, cursor: currentPage === 1 ? 'not-allowed' : 'pointer' }}
+                >
+                  <ChevronLeft size={16} /> Sebelumnya
+                </button>
+
+                {getPageNumbers().map((pageNum) => (
+                  <button
+                    key={pageNum}
+                    onClick={() => setCurrentPage(pageNum)}
+                    style={{
+                      ...styles.numBtn,
+                      backgroundColor: currentPage === pageNum ? '#2563eb' : '#ffffff',
+                      color: currentPage === pageNum ? '#ffffff' : '#334155',
+                      borderColor: currentPage === pageNum ? '#2563eb' : '#cbd5e1',
+                      fontWeight: currentPage === pageNum ? '700' : '500',
+                    }}
+                  >
+                    {pageNum}
+                  </button>
+                ))}
+
+                <button
+                  onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+                  disabled={currentPage === totalPages || totalPages === 0}
+                  style={{ ...styles.pageNavBtn, opacity: currentPage === totalPages || totalPages === 0 ? 0.5 : 1, cursor: currentPage === totalPages || totalPages === 0 ? 'not-allowed' : 'pointer' }}
+                >
+                  Selanjutnya <ChevronRight size={16} />
+                </button>
+              </div>
+            </div>
+          </>
         )}
       </div>
 
@@ -621,13 +695,7 @@ const styles = {
   selectInput: { padding: '10px 16px', borderRadius: '8px', border: '1px solid #cbd5e1', backgroundColor: '#fff', outline: 'none' },
 
   tableCard: { backgroundColor: '#fff', borderRadius: '12px', border: '1px solid #e2e8f0', overflow: 'hidden' },
-  
-  // CONTAINER DENGAN DUKUNGAN SCROLL LOKAL MAKSIMAL 10 BARIS
-  tableScrollContainer: {
-    maxHeight: '550px',
-    overflowY: 'auto',
-    overflowX: 'auto',
-  },
+  tableScrollContainer: { maxHeight: '550px', overflowY: 'auto', overflowX: 'auto' },
 
   table: { width: '100%', borderCollapse: 'collapse', textAlign: 'left' },
   th: { 
@@ -662,6 +730,13 @@ const styles = {
 
   loadingText: { textAlign: 'center', padding: '40px', color: '#64748b' },
   emptyText: { display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '40px', color: '#94a3b8' },
+
+  // Style Pagination
+  paginationContainer: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 20px', borderTop: '1px solid #e2e8f0', backgroundColor: '#f8fafc', flexWrap: 'wrap', gap: '12px' },
+  paginationInfo: { fontSize: '13px', color: '#64748b' },
+  paginationButtons: { display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' },
+  pageNavBtn: { display: 'flex', alignItems: 'center', gap: '4px', padding: '6px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', backgroundColor: '#ffffff', color: '#334155', fontSize: '13px', fontWeight: '600' },
+  numBtn: { minWidth: '32px', height: '32px', padding: '0 6px', borderRadius: '6px', border: '1px solid', fontSize: '13px', cursor: 'pointer', transition: 'all 0.15s' },
 
   modalOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15, 23, 42, 0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 },
   modalContent: { backgroundColor: '#fff', width: '100%', maxWidth: '480px', borderRadius: '12px', padding: '24px' },

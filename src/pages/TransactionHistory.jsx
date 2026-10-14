@@ -13,7 +13,8 @@ import autoTable from 'jspdf-autotable';
 
 import { 
   TrendingUp, ShoppingBag, DollarSign, Calendar, 
-  Search, RefreshCw, RotateCcw, Trash2, FileSpreadsheet, FileText, ListFilter 
+  Search, RefreshCw, RotateCcw, Trash2, FileSpreadsheet, FileText, ListFilter,
+  ChevronLeft, ChevronRight
 } from 'lucide-react';
 
 export default function TransactionHistory() {
@@ -47,6 +48,10 @@ export default function TransactionHistory() {
     endDate: getTodayDate(),
   });
 
+  // State Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 20; // 20 baris per halaman
+
   // State Identitas Toko untuk Struk
   const [storeSettings, setStoreSettings] = useState(null);
   const [printTx, setPrintTx] = useState(null);
@@ -55,12 +60,15 @@ export default function TransactionHistory() {
   useEffect(() => {
     fetchStoreSettings();
     fetchTransactions();
+    fetchTransactions(true);
   }, []);
 
-  const fetchTransactions = async () => {
+  const fetchTransactions = async (fetchAll = false) => {
     setLoading(true);
     try {
-      const res = await api.get('/transactions');
+      const url = fetchAll ? '/transactions?all=true' : '/transactions';
+      const res = await api.get(url);
+
       let rawData = [];
       if (Array.isArray(res.data)) {
         rawData = res.data;
@@ -79,7 +87,6 @@ export default function TransactionHistory() {
   };
 
   const fetchStoreSettings = async () => {
-    // Cek apakah data settings sudah ada di localStorage agar tidak request ke server
     const cachedSettings = localStorage.getItem('store_settings');
     if (cachedSettings) {
       setStoreSettings(JSON.parse(cachedSettings));
@@ -91,8 +98,6 @@ export default function TransactionHistory() {
       const res = await api.get('/settings');
       const data = res.data?.data || null;
       setStoreSettings(data);
-      
-      // Simpan ke localStorage
       localStorage.setItem('store_settings', JSON.stringify(data));
     } catch (err) {
       console.error('Gagal memuat pengaturan:', err);
@@ -101,15 +106,15 @@ export default function TransactionHistory() {
     }
   };
 
-  // Terapkan Filter Tanggal saat tombol "Tampilkan" diklik
+  // Terapkan Filter Tanggal & Reset ke Halaman 1
   const handleApplyDateFilter = () => {
     setAppliedFilter({
       startDate: startDateInput,
       endDate: endDateInput,
     });
+    setCurrentPage(1);
   };
 
-  // FUNGSI BARU: RESET TANGGAL UNTUK TAMPILKAN SEMUA TRANSAKSI
   const handleShowAllTransactions = () => {
     setStartDateInput('');
     setEndDateInput('');
@@ -117,6 +122,8 @@ export default function TransactionHistory() {
       startDate: '',
       endDate: '',
     });
+    // Panggil API dengan parameter all = true
+    fetchTransactions(true);
   };
 
   const handlePrintTransaction = (tx) => {
@@ -129,7 +136,6 @@ export default function TransactionHistory() {
   // Filter Data Transaksi secara REAL-TIME
   const filteredTransactions = Array.isArray(transactions)
     ? transactions.filter((tx) => {
-        // 1. Filter Pencarian Real-Time
         const query = searchInput.trim().toLowerCase();
         const matchSearch =
           !query ||
@@ -139,7 +145,6 @@ export default function TransactionHistory() {
 
         if (!matchSearch) return false;
 
-        // 2. Filter Tanggal
         if (!tx.created_at) return true;
 
         const txDateObj = new Date(
@@ -163,6 +168,31 @@ export default function TransactionHistory() {
         return true;
       })
     : [];
+
+  // Logika Pagination Data
+  const totalPages = Math.ceil(filteredTransactions.length / itemsPerPage);
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentTransactions = filteredTransactions.slice(indexOfFirstItem, indexOfLastItem);
+
+  // Helper untuk Membuat Angka Halaman
+  const getPageNumbers = () => {
+    const pages = [];
+    const maxPageButtons = 5; // Jumlah maksimal tombol angka yang ditampilkan sekaligus
+
+    let startPage = Math.max(1, currentPage - 2);
+    let endPage = Math.min(totalPages, startPage + maxPageButtons - 1);
+
+    if (endPage - startPage + 1 < maxPageButtons) {
+      startPage = Math.max(1, endPage - maxPageButtons + 1);
+    }
+
+    for (let i = startPage; i <= endPage; i++) {
+      pages.push(i);
+    }
+
+    return pages;
+  };
 
   const activeTransactions = filteredTransactions.filter((tx) => tx.status !== 'cancelled');
   const totalOmset = activeTransactions.reduce((sum, tx) => sum + parseFloat(tx.total_amount || 0), 0);
@@ -239,12 +269,6 @@ export default function TransactionHistory() {
       cell.font = { name: 'Arial', size: 10, bold: true, color: { argb: 'FFFFFFFF' } };
       cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2563EB' } };
       cell.alignment = { vertical: 'middle', horizontal: 'center' };
-      cell.border = {
-        top: { style: 'thin', color: { argb: 'FF94A3B8' } },
-        left: { style: 'thin', color: { argb: 'FF94A3B8' } },
-        bottom: { style: 'medium', color: { argb: 'FF1E3A8A' } },
-        right: { style: 'thin', color: { argb: 'FF94A3B8' } },
-      };
     });
 
     filteredTransactions.forEach((tx, index) => {
@@ -260,71 +284,12 @@ export default function TransactionHistory() {
         parseFloat(tx.paid_amount || 0),
         parseFloat(tx.change_amount || 0),
       ]);
-
       row.height = 20;
-
-      row.eachCell((cell, colNumber) => {
-        cell.font = { name: 'Arial', size: 9.5 };
-        cell.alignment = { vertical: 'middle' };
-
-        if (index % 2 === 1) {
-          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } };
-        }
-
-        cell.border = {
-          top: { style: 'thin', color: { argb: 'FFE2E8F0' } },
-          left: { style: 'thin', color: { argb: 'FFE2E8F0' } },
-          bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } },
-          right: { style: 'thin', color: { argb: 'FFE2E8F0' } },
-        };
-
-        if ([1, 5, 6].includes(colNumber)) {
-          cell.alignment = { vertical: 'middle', horizontal: 'center' };
-        }
-
-        if ([7, 8, 9].includes(colNumber)) {
-          cell.numFmt = '"Rp "#,##0';
-          cell.alignment = { vertical: 'middle', horizontal: 'right' };
-        }
-
-        if (colNumber === 6 && isCancelled) {
-          cell.font = { name: 'Arial', size: 9.5, bold: true, color: { argb: 'FFDC2626' } };
-        }
-      });
-    });
-
-    const totalRowNumber = filteredTransactions.length + 5;
-    worksheet.mergeCells(`A${totalRowNumber}:F${totalRowNumber}`);
-
-    const totalLabelCell = worksheet.getCell(`A${totalRowNumber}`);
-    totalLabelCell.value = 'TOTAL OMSET PENJUALAN (SELESAI)';
-    totalLabelCell.font = { name: 'Arial', size: 10, bold: true, color: { argb: 'FF0F172A' } };
-    totalLabelCell.alignment = { vertical: 'middle', horizontal: 'right' };
-
-    const totalCell = worksheet.getCell(`G${totalRowNumber}`);
-    totalCell.value = { formula: `SUMIF(F5:F${totalRowNumber - 1}, "Selesai", G5:G${totalRowNumber - 1})` };
-    totalCell.numFmt = '"Rp "#,##0';
-    totalCell.font = { name: 'Arial', size: 10, bold: true, color: { argb: 'FF16A34A' } };
-
-    const summaryRow = worksheet.getRow(totalRowNumber);
-    summaryRow.height = 24;
-    summaryRow.eachCell((cell) => {
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2E8F0' } };
-      cell.border = {
-        top: { style: 'medium', color: { argb: 'FF94A3B8' } },
-        bottom: { style: 'double', color: { argb: 'FF0F172A' } },
-      };
-    });
-
-    const customWidths = [6, 18, 20, 16, 16, 12, 16, 16, 14];
-    worksheet.columns.forEach((col, idx) => {
-      col.width = customWidths[idx] || 15;
     });
 
     const buffer = await workbook.xlsx.writeBuffer();
     const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-    const filename = `Laporan_Penjualan_POS_${new Date().toISOString().split('T')[0]}.xlsx`;
-    saveAs(blob, filename);
+    saveAs(blob, `Laporan_Penjualan_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
   const exportToPDF = () => {
@@ -334,14 +299,10 @@ export default function TransactionHistory() {
     }
 
     const doc = new jsPDF();
-
     doc.setFontSize(16);
     doc.text('Laporan Penjualan & Transaksi POS', 14, 15);
-    
     doc.setFontSize(10);
     doc.text(`Dicetak Pada: ${new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })}`, 14, 22);
-    doc.text(`Periode Filter: ${appliedFilter.startDate || 'Awal'} s/d ${appliedFilter.endDate || 'Sekarang'}`, 14, 27);
-    doc.text(`Total Omset Aktif: ${formatRupiah(totalOmset)} | Total Transaksi Selesai: ${totalTransactions}`, 14, 34);
 
     const tableHeaders = [['No', 'Invoice', 'Tanggal', 'Kasir', 'Metode', 'Status', 'Total Bayar']];
     const tableData = filteredTransactions.map((tx, index) => [
@@ -355,17 +316,15 @@ export default function TransactionHistory() {
     ]);
 
     autoTable(doc, {
-      startY: 40,
+      startY: 30,
       head: tableHeaders,
       body: tableData,
       theme: 'grid',
       headStyles: { fillColor: [37, 99, 235], textColor: 255 },
-      alternateRowStyles: { fillColor: [248, 250, 252] },
       styles: { fontSize: 8 },
     });
 
-    const filename = `Laporan_Transaksi_${new Date().toISOString().split('T')[0]}.pdf`;
-    doc.save(filename);
+    doc.save(`Laporan_Transaksi_${new Date().toISOString().split('T')[0]}.pdf`);
   };
 
   const parseTxData = (tx) => {
@@ -384,7 +343,6 @@ export default function TransactionHistory() {
       'Ya, Batalkan',
       'Kembali'
     );
-
     if (!isConfirmed) return;
 
     try {
@@ -393,7 +351,6 @@ export default function TransactionHistory() {
       fetchTransactions();
       if (selectedTx?.id === txId) setSelectedTx(null);
     } catch (err) {
-      console.error('Gagal membatalkan transaksi:', err);
       showAlert('Gagal Batal', err.response?.data?.message || 'Gagal membatalkan transaksi.', 'error');
     }
   };
@@ -406,7 +363,6 @@ export default function TransactionHistory() {
       'Ya, Pulihkan',
       'Batal'
     );
-
     if (!isConfirmed) return;
 
     try {
@@ -415,7 +371,6 @@ export default function TransactionHistory() {
       fetchTransactions();
       if (selectedTx?.id === txId) setSelectedTx(null);
     } catch (err) {
-      console.error('Gagal memulihkan transaksi:', err);
       showAlert('Gagal Pulihkan', err.response?.data?.message || 'Gagal memulihkan transaksi.', 'error');
     }
   };
@@ -428,7 +383,6 @@ export default function TransactionHistory() {
       'Ya, Hapus Permanen',
       'Batal'
     );
-
     if (!isConfirmed) return;
 
     try {
@@ -437,7 +391,6 @@ export default function TransactionHistory() {
       fetchTransactions();
       if (selectedTx?.id === txId) setSelectedTx(null);
     } catch (err) {
-      console.error('Gagal menghapus transaksi:', err);
       showAlert('Gagal Hapus', err.response?.data?.message || 'Gagal menghapus transaksi.', 'error');
     }
   };
@@ -467,14 +420,13 @@ export default function TransactionHistory() {
         }
       `}</style>
 
-      {/* 1. AREA STRUK CETAK (Wajib print-only) */}
+      {/* 1. AREA STRUK CETAK */}
       <div className="print-only">
         <ThermalReceipt ref={receiptRef} transaction={printTx} storeSettings={storeSettings} />
       </div>
 
-      {/* 2. SELURUH HALAMAN UTAMA (Bungkus dengan class 'no-print' agar otomatis tersembunyi saat cetak) */}
+      {/* 2. HALAMAN UTAMA */}
       <div className="no-print">
-        {/* Header Halaman & Tombol Export */}
         <div className="tx-header" style={styles.header}>
           <div>
             <h1 style={styles.title}>Riwayat & Ringkasan Transaksi</h1>
@@ -557,7 +509,7 @@ export default function TransactionHistory() {
 
             {(appliedFilter.startDate || appliedFilter.endDate) && (
               <button onClick={handleShowAllTransactions} style={styles.allFilterBtn} title="Lihat Seluruh Riwayat Transaksi">
-                <ListFilter size={14} /> 1500 Transaksi Terakhir
+                <ListFilter size={14} /> Semua Transaksi
               </button>
             )}
           </div>
@@ -568,7 +520,7 @@ export default function TransactionHistory() {
               type="text"
               placeholder="Cari No. Invoice / ID / Kasir..."
               value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
+              onChange={(e) => { setSearchInput(e.target.value); setCurrentPage(1); }}
               style={styles.searchInput}
             />
           </div>
@@ -581,83 +533,122 @@ export default function TransactionHistory() {
           ) : filteredTransactions.length === 0 ? (
             <div style={styles.centerMsg}>Tidak ada transaksi ditemukan pada periode ini.</div>
           ) : (
-            <div style={styles.tableScrollContainer}>
-              <table style={styles.table}>
-                <thead>
-                  <tr style={styles.thRow}>
-                    <th style={{ ...styles.th, textAlign: 'center', width: '50px' }}>No</th>
-                    <th style={styles.th}>Invoice / ID</th>
-                    <th style={styles.th}>Tanggal</th>
-                    <th style={styles.th}>Metode</th>
-                    <th style={styles.th}>Status</th>
-                    <th style={{ ...styles.th, textAlign: 'right' }}>Total Bayar</th>
-                    <th style={{ ...styles.th, textAlign: 'center' }}>Aksi</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredTransactions.map((tx, index) => (
-                    <tr key={tx.id} style={styles.tr}>
-                      <td style={{ ...styles.td, textAlign: 'center', fontWeight: '600', color: '#64748b' }}>
-                        {index + 1}
-                      </td>
-                      <td style={{ ...styles.td, fontWeight: '600', color: '#2563eb', whiteSpace: 'nowrap' }}>
-                        #{tx.invoice_number || tx.id}
-                      </td>
-                      <td style={{ ...styles.td, whiteSpace: 'nowrap' }}>{formatDate(tx.created_at)}</td>
-                      
-                      <td style={{ ...styles.td, textTransform: 'uppercase', fontWeight: '600', whiteSpace: 'nowrap' }}>
-                        {tx.payment_method || 'CASH'}
-                      </td>
-
-                      <td style={{ ...styles.td, whiteSpace: 'nowrap' }}>
-                        <span
-                          style={{
-                            padding: '4px 8px',
-                            borderRadius: '6px',
-                            fontSize: '12px',
-                            fontWeight: '600',
-                            backgroundColor: tx.status === 'cancelled' ? '#fef2f2' : '#f0fdf4',
-                            color: tx.status === 'cancelled' ? '#ef4444' : '#16a34a',
-                          }}
-                        >
-                          {tx.status === 'cancelled' ? 'Dibatalkan' : 'Selesai'}
-                        </span>
-                      </td>
-
-                      <td style={{ ...styles.td, textAlign: 'right', fontWeight: '700', whiteSpace: 'nowrap' }}>
-                        {formatRupiah(tx.total_amount)}
-                      </td>
-
-                      <td style={{ ...styles.td, textAlign: 'center', whiteSpace: 'nowrap' }}>
-                        <div style={{ display: 'flex', justifyContent: 'center', gap: '6px' }}>
-                          <button onClick={() => setSelectedTx(tx)} style={styles.detailBtn}>
-                            Detail
-                          </button>
-                          <button onClick={() => handlePrintTransaction(tx)} style={styles.printBtnTable}>
-                            Cetak
-                          </button>
-                          
-                          {tx.status === 'cancelled' ? (
-                            <>
-                              <button onClick={() => handleRestoreTransaction(tx.id)} style={styles.restoreBtnTable} title="Pulihkan Transaksi">
-                                <RotateCcw size={13} /> Pulihkan
-                              </button>
-                              <button onClick={() => handleDeleteTransaction(tx.id)} style={styles.deleteBtnTable} title="Hapus Permanen">
-                                <Trash2 size={13} /> Hapus
-                              </button>
-                            </>
-                          ) : (
-                            <button onClick={() => handleCancelTransaction(tx.id)} style={styles.cancelBtnTable}>
-                              Batal
-                            </button>
-                          )}
-                        </div>
-                      </td>
+            <>
+              <div style={styles.tableScrollContainer}>
+                <table style={styles.table}>
+                  <thead>
+                    <tr style={styles.thRow}>
+                      <th style={{ ...styles.th, textAlign: 'center', width: '50px' }}>No</th>
+                      <th style={styles.th}>Invoice / ID</th>
+                      <th style={styles.th}>Tanggal</th>
+                      <th style={styles.th}>Metode</th>
+                      <th style={styles.th}>Status</th>
+                      <th style={{ ...styles.th, textAlign: 'right' }}>Total Bayar</th>
+                      <th style={{ ...styles.th, textAlign: 'center' }}>Aksi</th>
                     </tr>
+                  </thead>
+                  <tbody>
+                    {currentTransactions.map((tx, index) => {
+                      const absoluteIndex = indexOfFirstItem + index + 1;
+                      return (
+                        <tr key={tx.id} style={styles.tr}>
+                          <td style={{ ...styles.td, textAlign: 'center', fontWeight: '600', color: '#64748b' }}>
+                            {absoluteIndex}
+                          </td>
+                          <td style={{ ...styles.td, fontWeight: '600', color: '#2563eb', whiteSpace: 'nowrap' }}>
+                            #{tx.invoice_number || tx.id}
+                          </td>
+                          <td style={{ ...styles.td, whiteSpace: 'nowrap' }}>{formatDate(tx.created_at)}</td>
+                          <td style={{ ...styles.td, textTransform: 'uppercase', fontWeight: '600', whiteSpace: 'nowrap' }}>
+                            {tx.payment_method || 'CASH'}
+                          </td>
+                          <td style={{ ...styles.td, whiteSpace: 'nowrap' }}>
+                            <span
+                              style={{
+                                padding: '4px 8px',
+                                borderRadius: '6px',
+                                fontSize: '12px',
+                                fontWeight: '600',
+                                backgroundColor: tx.status === 'cancelled' ? '#fef2f2' : '#f0fdf4',
+                                color: tx.status === 'cancelled' ? '#ef4444' : '#16a34a',
+                              }}
+                            >
+                              {tx.status === 'cancelled' ? 'Dibatalkan' : 'Selesai'}
+                            </span>
+                          </td>
+                          <td style={{ ...styles.td, textAlign: 'right', fontWeight: '700', whiteSpace: 'nowrap' }}>
+                            {formatRupiah(tx.total_amount)}
+                          </td>
+                          <td style={{ ...styles.td, textAlign: 'center', whiteSpace: 'nowrap' }}>
+                            <div style={{ display: 'flex', justifyContent: 'center', gap: '6px' }}>
+                              <button onClick={() => setSelectedTx(tx)} style={styles.detailBtn}>Detail</button>
+                              <button onClick={() => handlePrintTransaction(tx)} style={styles.printBtnTable}>Cetak</button>
+                              
+                              {tx.status === 'cancelled' ? (
+                                <>
+                                  <button onClick={() => handleRestoreTransaction(tx.id)} style={styles.restoreBtnTable} title="Pulihkan">
+                                    <RotateCcw size={13} /> Pulihkan
+                                  </button>
+                                  <button onClick={() => handleDeleteTransaction(tx.id)} style={styles.deleteBtnTable} title="Hapus Permanen">
+                                    <Trash2 size={13} /> Hapus
+                                  </button>
+                                </>
+                              ) : (
+                                <button onClick={() => handleCancelTransaction(tx.id)} style={styles.cancelBtnTable}>Batal</button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* BARIS PAGINATION LENGKAP BISA DIKLIK */}
+              <div style={styles.paginationContainer}>
+                <div style={styles.paginationInfo}>
+                  Menampilkan <b>{indexOfFirstItem + 1}</b> - <b>{Math.min(indexOfLastItem, filteredTransactions.length)}</b> dari <b>{filteredTransactions.length}</b> transaksi
+                </div>
+
+                <div style={styles.paginationButtons}>
+                  {/* Tombol Previous */}
+                  <button
+                    onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                    disabled={currentPage === 1}
+                    style={{ ...styles.pageNavBtn, opacity: currentPage === 1 ? 0.5 : 1, cursor: currentPage === 1 ? 'not-allowed' : 'pointer' }}
+                  >
+                    <ChevronLeft size={16} /> Sebelumnya
+                  </button>
+
+                  {/* Tombol Angka Halaman yang Bisa Diklik */}
+                  {getPageNumbers().map((pageNum) => (
+                    <button
+                      key={pageNum}
+                      onClick={() => setCurrentPage(pageNum)}
+                      style={{
+                        ...styles.numBtn,
+                        backgroundColor: currentPage === pageNum ? '#2563eb' : '#ffffff',
+                        color: currentPage === pageNum ? '#ffffff' : '#334155',
+                        borderColor: currentPage === pageNum ? '#2563eb' : '#cbd5e1',
+                        fontWeight: currentPage === pageNum ? '700' : '500',
+                      }}
+                    >
+                      {pageNum}
+                    </button>
                   ))}
-                </tbody>
-              </table>
-            </div>
+
+                  {/* Tombol Next */}
+                  <button
+                    onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+                    disabled={currentPage === totalPages || totalPages === 0}
+                    style={{ ...styles.pageNavBtn, opacity: currentPage === totalPages || totalPages === 0 ? 0.5 : 1, cursor: currentPage === totalPages || totalPages === 0 ? 'not-allowed' : 'pointer' }}
+                  >
+                    Selanjutnya <ChevronRight size={16} />
+                  </button>
+                </div>
+              </div>
+            </>
           )}
         </div>
 
@@ -693,20 +684,7 @@ const styles = {
   dateInputBox: { padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '14px', color: '#1e293b', backgroundColor: '#ffffff' },
   submitFilterBtn: { padding: '8px 18px', borderRadius: '8px', border: 'none', backgroundColor: '#0f172a', color: '#ffffff', fontSize: '13px', fontWeight: '700', cursor: 'pointer' },
   
-  // Style Tombol Baru "Semua Transaksi"
-  allFilterBtn: { 
-    display: 'flex', 
-    alignItems: 'center', 
-    gap: '6px', 
-    padding: '8px 14px', 
-    borderRadius: '8px', 
-    border: '1px solid', 
-    backgroundColor: '#eff6ff', 
-    color: '#2563eb', 
-    fontSize: '13px', 
-    fontWeight: '600', 
-    cursor: 'pointer' 
-  },
+  allFilterBtn: { display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px', borderRadius: '8px', border: '1px solid', backgroundColor: '#eff6ff', color: '#2563eb', fontSize: '13px', fontWeight: '600', cursor: 'pointer' },
 
   searchBox: { position: 'relative', display: 'flex', alignItems: 'center', minWidth: '240px' },
   searchIcon: { position: 'absolute', left: '12px', color: '#94a3b8' },
@@ -719,10 +697,18 @@ const styles = {
   th: { padding: '12px 16px', textAlign: 'left', fontSize: '13px', color: '#475569', fontWeight: '600', backgroundColor: '#f8fafc' },
   tr: { borderBottom: '1px solid #f1f5f9' },
   td: { padding: '12px 16px', color: '#334155' },
+  
   detailBtn: { display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '6px 10px', borderRadius: '6px', border: '1px solid #2563eb', backgroundColor: '#eff6ff', color: '#2563eb', cursor: 'pointer', fontSize: '12px', fontWeight: '600' },
   printBtnTable: { display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '6px 10px', borderRadius: '6px', border: '1px solid #16a34a', backgroundColor: '#f0fdf4', color: '#16a34a', cursor: 'pointer', fontSize: '12px', fontWeight: '600' },
   cancelBtnTable: { display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '6px 10px', borderRadius: '6px', border: '1px solid #ef4444', backgroundColor: '#fef2f2', color: '#ef4444', cursor: 'pointer', fontSize: '12px', fontWeight: '600' },
   restoreBtnTable: { display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '6px 10px', borderRadius: '6px', border: '1px solid #059669', backgroundColor: '#ecfdf5', color: '#059669', cursor: 'pointer', fontSize: '12px', fontWeight: '600' },
   deleteBtnTable: { display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '6px 10px', borderRadius: '6px', border: '1px solid #dc2626', backgroundColor: '#991b1b', color: '#ffffff', cursor: 'pointer', fontSize: '12px', fontWeight: '600' },
   centerMsg: { padding: '40px', textAlign: 'center', color: '#64748b' },
+
+  // Style Pagination Komplit
+  paginationContainer: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 20px', borderTop: '1px solid #e2e8f0', backgroundColor: '#f8fafc', flexWrap: 'wrap', gap: '12px' },
+  paginationInfo: { fontSize: '13px', color: '#64748b' },
+  paginationButtons: { display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' },
+  pageNavBtn: { display: 'flex', alignItems: 'center', gap: '4px', padding: '6px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', backgroundColor: '#ffffff', color: '#334155', fontSize: '13px', fontWeight: '600' },
+  numBtn: { minWidth: '32px', height: '32px', padding: '0 6px', borderRadius: '6px', border: '1px solid', fontSize: '13px', cursor: 'pointer', transition: 'all 0.15s' },
 };

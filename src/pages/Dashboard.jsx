@@ -31,6 +31,7 @@ export default function Dashboard() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  // Setiap kali 'period' berubah, fetchStats akan dipanggil otomatis
   useEffect(() => {
     fetchStats(period);
   }, [period]);
@@ -38,10 +39,11 @@ export default function Dashboard() {
   const fetchStats = async (selectedPeriod = period) => {
     setLoading(true);
     try {
+        // Parameter period dikirim ke API backend untuk memfilter seluruh data (termasuk top products)
         const res = await api.get(`/dashboard-stats?period=${selectedPeriod}&t=${Date.now()}`);
-        setStats(null); // Reset sebentar
+        setStats(null); 
         setTimeout(() => {
-        setStats(res.data.data);
+          setStats(res.data.data);
         }, 50);
     } catch (err) {
         console.error('Gagal mengambil data dashboard:', err);
@@ -81,7 +83,6 @@ export default function Dashboard() {
           <p style={styles.subtitle}>Ringkasan performa dan tren bisnis POS Anda</p>
         </div>
         
-        {/* Tombol Refresh yang posisinya menyesuaikan mode */}
         <button 
           onClick={() => fetchStats(period)} 
           style={styles.refreshBtn} 
@@ -94,7 +95,6 @@ export default function Dashboard() {
 
       {/* Metrics Cards (4 Kartu) */}
       <div style={styles.metricsGrid}>
-        {/* Card 1: Omset Hari Ini vs Kemarin */}
         <div style={styles.metricCard}>
           <div style={{ ...styles.iconBox, backgroundColor: '#eff6ff', color: '#2563eb' }}>
             <CalendarDays size={24} />
@@ -117,7 +117,6 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Card 2: Total Omset Keseluruhan */}
         <div style={styles.metricCard}>
           <div style={{ ...styles.iconBox, backgroundColor: '#f0fdf4', color: '#16a34a' }}>
             <DollarSign size={24} />
@@ -131,7 +130,6 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Card 3: Total Transaksi Selesai */}
         <div style={styles.metricCard}>
           <div style={{ ...styles.iconBox, backgroundColor: '#fef3c7', color: '#d97706' }}>
             <ShoppingBag size={24} />
@@ -145,7 +143,6 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Card 4: Status Peringatan Stok Menipis */}
         <div style={styles.metricCard}>
           <div style={{ ...styles.iconBox, backgroundColor: '#fef2f2', color: '#dc2626' }}>
             <AlertTriangle size={24} />
@@ -162,7 +159,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Grid Grafik & Low Stock Alert (1 Kolom di Mobile, 2 Kolom di PC) */}
+      {/* Grid Grafik */}
       <div 
         style={{
           ...styles.chartsGrid,
@@ -229,7 +226,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* CARD DOKUMEN / DAFAR STOK MENIPIS (LOW STOCK ALERT) */}
+        {/* CARD DOKUMEN / DAFTAR STOK MENIPIS */}
         <div style={styles.chartCard}>
           <h3 style={styles.chartTitle}>
             <AlertTriangle size={18} color="#dc2626" /> Peringatan Stok Menipis
@@ -253,14 +250,16 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* Grafik 2: Top 5 Produk Terlaris */}
+        {/* Grafik 2: Top 5 Produk Terlaris (Qty) - Otomatis terfilter berdasarkan state 'period' */}
         <div style={styles.chartCard}>
-          <h3 style={styles.chartTitle}>
-            <PackageCheck size={18} color="#16a34a" /> Top 5 Produk Terlaris (Qty)
-          </h3>
+          <div style={styles.chartHeader}>
+            <h3 style={styles.chartTitle}>
+              <PackageCheck size={18} color="#16a34a" /> Top 5 Produk Terlaris ({period === 'daily' ? '7 Hari' : period === 'monthly' ? 'Bulan Ini' : 'Tahun Ini'})
+            </h3>
+          </div>
           <div style={{ width: '100%', height: 220 }}>
             <ResponsiveContainer>
-              <BarChart data={stats?.top_products || []} layout="vertical">
+              <BarChart data={stats?.top_products || []} layout="vertical" key={period}>
                 <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e2e8f0" />
                 <XAxis type="number" stroke="#64748b" fontSize={12} />
                 <YAxis dataKey="name" type="category" width={90} stroke="#64748b" fontSize={11} />
