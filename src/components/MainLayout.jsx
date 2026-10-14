@@ -23,25 +23,61 @@ export default function MainLayout() {
 
   // Load Setting Toko dari Database
   useEffect(() => {
+    let isMounted = true;
+
+    const fetchStoreSettings = async () => {
+      try {
+        const res = await api.get('/settings');
+        const data = res.data?.data || null;
+
+        if (!isMounted) return;
+        setStoreSettings(data);
+
+        // 1. OTOMATIS UBAH JUDUL TAB BROWSER (TITLE)
+        if (data?.store_name) {
+          document.title = `${data.store_name} - POS System`;
+        }
+
+        // 2. OTOMATIS UBAH FAVICON LOGO BROWSER DARI STORAGE
+        if (data?.store_logo) {
+          let baseUrl = import.meta.env.VITE_API_URL 
+            ? import.meta.env.VITE_API_URL.replace(/\/api\/?$/, '') 
+            : 'https://api.firza-portofolio.my.id';
+
+          if (baseUrl.includes('://.firza')) {
+            baseUrl = baseUrl.replace('://.firza', '://api.firza');
+          }
+
+          const cleanPath = data.store_logo.startsWith('/') ? data.store_logo : `/${data.store_logo}`;
+          const currentLogoUrl = `${baseUrl}/storage${cleanPath.replace('/storage', '')}`;
+
+          let link = document.querySelector("link[rel*='icon']");
+          if (!link) {
+            link = document.createElement('link');
+            link.rel = 'icon';
+            document.head.appendChild(link);
+          }
+          link.href = currentLogoUrl;
+        }
+      } catch (err) {
+        console.error('Gagal memuat setting toko:', err);
+      }
+    };
+
     fetchStoreSettings();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
-  const fetchStoreSettings = async () => {
-    try {
-      const res = await api.get('/settings');
-      setStoreSettings(res.data?.data || null);
-    } catch (err) {
-      console.error('Gagal memuat setting toko:', err);
-    }
-  };
-
-  // Format URL Logo
+  // Format URL Logo untuk Sidebar / Header
   const backendBaseUrl = import.meta.env.VITE_API_URL 
-    ? import.meta.env.VITE_API_URL.replace('/api', '') 
+    ? import.meta.env.VITE_API_URL.replace(/\/api\/?$/, '') 
     : 'https://api.firza-portofolio.my.id';
 
   const logoUrl = storeSettings?.store_logo 
-    ? `${backendBaseUrl}/storage/${storeSettings.store_logo}`
+    ? `${backendBaseUrl}/storage/${storeSettings.store_logo.replace('/storage/', '').replace(/^\//, '')}`
     : null;
 
   const storeName = storeSettings?.store_name || 'POS System';
@@ -359,20 +395,10 @@ const styles = {
   brandSubtitle: { 
     fontSize: '11px', 
     color: '#94a3b8', 
-    overflow: 'hidden', 
-    textOverflow: 'ellipsis', 
     display: 'block', 
-    wordBreak: 'break-word', // Memastikan teks panjang terbungkus rapi ke bawah
+    wordBreak: 'break-word',
     overflow: 'visible'
   },
-  
-  // brandSubtitle: { 
-  //   fontSize: '11px', 
-  //   color: '#94a3b8', 
-  //   display: 'block',
-  //   wordBreak: 'break-word', // Memastikan teks panjang terbungkus rapi ke bawah
-  //   overflow: 'visible'      // Memastikan tidak ada bagian teks yang disembunyikan
-  // },
 
   userCard: {
     display: 'flex',

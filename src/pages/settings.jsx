@@ -94,20 +94,69 @@ export default function Settings() {
     }
   };
 
+  // FUNGSI KOMPRESI GAMBAR OTOMATIS
   const handleLogoChange = (e) => {
     const file = e.target.files[0];
-    if (file) {
-      // Cek apakah ukuran file lebih dari 2MB (2 * 1024 * 1024 bytes)
-      if (file.size > 2 * 1024 * 1024) {
-        showToast('Ukuran gambar terlalu besar! Maksimal 2MB.', 'error');
-        e.target.value = ''; // Reset input
-        return;
-      }
+    if (!file) return;
 
-      setLogoFile(file);
-      setLogoPreview(URL.createObjectURL(file));
-      setRemoveLogo(false);
+    // Cek apakah file adalah gambar
+    if (!file.type.startsWith('image/')) {
+      showToast('Harap pilih file gambar (JPG/PNG)', 'error');
+      return;
     }
+
+    // Baca file menggunakan FileReader & Canvas untuk kompresi
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = (event) => {
+      const img = new Image();
+      img.src = event.target.result;
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+
+        // Batasi resolusi maksimal (misal lebar/tinggi max 500px) agar ukuran file jadi kecil
+        const MAX_SIZE = 500;
+        if (width > height) {
+          if (width > MAX_SIZE) {
+            height *= MAX_SIZE / width;
+            width = MAX_SIZE;
+          }
+        } else {
+          if (height > MAX_SIZE) {
+            width *= MAX_SIZE / height;
+            height = MAX_SIZE;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+
+        // Ubah ke format blob/file dengan kualitas 0.8 (80%)
+        canvas.toBlob((blob) => {
+          if (!blob) {
+            showToast('Gagal memproses gambar', 'error');
+            return;
+          }
+
+          // Buat file baru dari hasil kompresi canvas
+          const compressedFile = new File([blob], file.name, {
+            type: 'image/jpeg',
+            lastModified: Date.now(),
+          });
+
+          // Set preview & file yang akan dikirim (ukuran kini sudah di bawah 100KB)
+          setLogoFile(compressedFile);
+          setLogoPreview(URL.createObjectURL(compressedFile));
+          setRemoveLogo(false);
+          
+          showToast('Gambar berhasil dikompres & siap disimpan', 'success');
+        }, 'image/jpeg', 0.8);
+      };
+    };
   };
 
   const handleRemoveLogo = () => {

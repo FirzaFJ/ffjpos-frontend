@@ -12,7 +12,6 @@ import Users from './pages/Users.jsx';
 import Login from './pages/Login.jsx';
 import Settings from './pages/settings.jsx';
 
-// Import Halaman Baru
 import ProfitLossReport from './pages/ProfitLossReport.jsx';
 import StockInHistory from './pages/StockInHistory.jsx';
 
